@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Upload, Download, AlertCircle, Check, RefreshCw } from "lucide-react";
 
-const API_URL = "http://localhost:3001";
+const API_URL = "https://cajas-bancos-app.onrender.com";
 
 const BancoReconciliacion = () => {
   const [estadoCuentaFile, setEstadoCuentaFile] = useState(null);

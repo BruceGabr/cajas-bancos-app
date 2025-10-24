@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import axios from "axios";
 
+const API_URL = "https://cajas-bancos-app.onrender.com"; // URL pública de tu backend
+
 export default function UploadEstadoCuenta({ onRegistros }) {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -17,12 +19,10 @@ export default function UploadEstadoCuenta({ onRegistros }) {
 
     try {
       setLoading(true);
-      const res = await axios.post(
-        "http://localhost:5000/upload-estado-cuenta",
-        formData
-      );
+      const res = await axios.post(`${API_URL}/api/procesar`, formData);
+
       if (res.data.success) {
-        onRegistros(res.data.registros);
+        onRegistros(res.data.registros); // asumiendo que tu backend devuelve 'registros'
         alert("Archivo procesado correctamente");
       } else {
         alert("Error procesando el archivo");

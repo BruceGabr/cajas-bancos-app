@@ -18,13 +18,14 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Middleware
+// Middleware: CORS para permitir frontend en Vercel
 app.use(
   cors({
     origin: "https://cajas-bancos-app-9aiv.vercel.app", // URL de tu frontend en Vercel
     methods: ["GET", "POST"],
   })
 );
+
 app.use(express.json());
 
 // Configuración de Multer para subida de archivos
@@ -97,6 +98,7 @@ app.use((error, req, res, next) => {
   });
 });
 
+// Escuchar puerto asignado por Render
 app.listen(PORT, () => {
-  console.log(`✅ Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`✅ Servidor corriendo en Render en el puerto ${PORT}`);
 });

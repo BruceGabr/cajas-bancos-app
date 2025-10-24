@@ -305,7 +305,7 @@ const BancoReconciliacion = () => {
 
         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
           <h3 className="text-sm font-semibold text-blue-900 mb-3">
-            ℹ️ Información Importante
+            ℹ️ Funcionamiento
           </h3>
           <ul className="text-sm text-blue-800 space-y-2">
             <li className="flex items-start gap-2">
@@ -323,11 +323,11 @@ const BancoReconciliacion = () => {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-blue-600 mt-0.5">•</span>
-              <span>Los ingresos se registran en DEBE con 0 en HABER</span>
+              <span>Los ingresos se registran en DEBE y 0 en HABER</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-blue-600 mt-0.5">•</span>
-              <span>Los egresos se registran en HABER con 0 en DEBE</span>
+              <span>Los egresos se registran en HABER</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-blue-600 mt-0.5">•</span>

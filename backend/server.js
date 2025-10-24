@@ -19,7 +19,12 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // Middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: "https://cajas-bancos-app-9aiv.vercel.app", // URL de tu frontend en Vercel
+    methods: ["GET", "POST"],
+  })
+);
 app.use(express.json());
 
 // Configuración de Multer para subida de archivos

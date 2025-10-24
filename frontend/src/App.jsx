@@ -7,7 +7,7 @@ const BancoReconciliacion = () => {
   const [estadoCuentaFile, setEstadoCuentaFile] = useState(null);
   const [cajasFile, setCajasFile] = useState(null);
   const [moneda, setMoneda] = useState("MN");
-  const [mes, setMes] = useState("SEPTIEMBRE");
+  const [mes, setMes] = useState("ENERO");
   const [alerts, setAlerts] = useState([]);
   const [processing, setProcessing] = useState(false);
   const [resultFile, setResultFile] = useState(null);
@@ -21,7 +21,7 @@ const BancoReconciliacion = () => {
     "JUNIO",
     "JULIO",
     "AGOSTO",
-    "SEPTIEMBRE",
+    "SETIEMBRE",
     "OCTUBRE",
     "NOVIEMBRE",
     "DICIEMBRE",

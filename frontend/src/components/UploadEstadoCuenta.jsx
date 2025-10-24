@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 
-const API_URL = "https://cajas-bancos-app.onrender.com"; // URL pública de tu backend
+const API_URL = "https://cajas-bancos-app-production.up.railway.app"; // URL pública de tu backend
 
 export default function UploadEstadoCuenta({ onRegistros }) {
   const [file, setFile] = useState(null);

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Upload, Download, AlertCircle, Check, RefreshCw } from "lucide-react";
 
-const API_URL = "https://cajas-bancos-app.onrender.com";
+const API_URL = "https://cajas-bancos-app-production.up.railway.app";
 
 const BancoReconciliacion = () => {
   const [estadoCuentaFile, setEstadoCuentaFile] = useState(null);

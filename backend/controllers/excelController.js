@@ -203,7 +203,7 @@ export const procesarConciliacion = async (req, res) => {
 
       // Resaltar en amarillo las columnas C → O del registro insertado
       for (let col = 3; col <= 15; col++) {
-        sheet.cell(rowIdx, col).style({ fill: { type: "solid", color: "#FFFF00" } });
+        sheet.cell(rowIdx, col).style("fill", "FFFF00");
       }
     });
 

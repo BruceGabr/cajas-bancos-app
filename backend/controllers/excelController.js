@@ -184,7 +184,18 @@ export const procesarConciliacion = async (req, res) => {
       const fechaExcel = convertirFechaExcel(reg.fecha);
       cellFecha.value(fechaExcel);
 
-      sheet.cell(rowIdx, colN).value(reg.nDoc);
+      // ✅ Corrección: insertar N° Doc como número real para evitar advertencia
+      const nDocRaw = reg.nDoc ?? "";
+      const nDocCell = sheet.cell(rowIdx, colN);
+
+      if (/^\d+$/.test(String(nDocRaw).trim())) {
+        const nDocNum = Number(String(nDocRaw).trim());
+        nDocCell.value(nDocNum);
+        nDocCell.style("numberFormat", "0");
+      } else {
+        nDocCell.value(String(nDocRaw).trim());
+      }
+
       sheet.cell(rowIdx, colDesc).value(reg.descripcion);
 
       if (reg.importe > 0) {

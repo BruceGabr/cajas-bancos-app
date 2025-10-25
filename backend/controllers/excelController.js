@@ -90,6 +90,7 @@ const procesarEstadoCuenta = async (filePath) => {
   const registros = [];
   const registrosExcluidos = [];
   const endRow = usedRange.endCell().rowNumber();
+  let totalRegistros = 0; // Contador total de registros válidos
 
   for (let row = headerRow + 1; row <= endRow; row++) {
     const concepto = sheet.cell(row, conceptoCol).value();
@@ -102,13 +103,16 @@ const procesarEstadoCuenta = async (filePath) => {
     const fecha = sheet.cell(row, fOpCol).value();
     const importe = parseFloat(sheet.cell(row, importeCol).value()) || 0;
 
-    // 🚫 Eliminar saldos iniciales/finales (no se almacenan)
+    // 🚫 Eliminar saldos iniciales/finales (no se almacenan ni cuentan)
     if (
       conceptoStr.startsWith("Saldo Inicial:") ||
       conceptoStr.startsWith("Saldo Final:")
     ) {
       continue;
     }
+
+    // Incrementar contador de registros válidos
+    totalRegistros++;
 
     // 📦 Almacenar ITF y comisiones como excluidos
     if (conceptoStr === "ITF") {
@@ -138,7 +142,7 @@ const procesarEstadoCuenta = async (filePath) => {
 
   registros.sort((a, b) => parseInt(a.nDoc) - parseInt(b.nDoc));
 
-  return { registros, registrosExcluidos };
+  return { registros, registrosExcluidos, totalRegistros };
 };
 
 // Controlador principal
@@ -159,8 +163,11 @@ export const procesarConciliacion = async (req, res) => {
     const estadoCuentaPath = req.files.estadoCuenta[0].path;
     const cajasYBancosPath = req.files.cajasYBancos[0].path;
 
-    const { registros: registrosEC, registrosExcluidos } =
-      await procesarEstadoCuenta(estadoCuentaPath);
+    const {
+      registros: registrosEC,
+      registrosExcluidos,
+      totalRegistros,
+    } = await procesarEstadoCuenta(estadoCuentaPath);
 
     const workbook = await XlsxPopulate.fromFileAsync(cajasYBancosPath);
 
@@ -237,7 +244,7 @@ export const procesarConciliacion = async (req, res) => {
       fs.unlinkSync(cajasYBancosPath);
       return res.json({
         success: true,
-        totalRegistrosEstadoCuenta: registrosEC.length,
+        totalRegistrosEstadoCuenta: totalRegistros,
         registrosAgregados: 0,
         registrosNoAgregados: registrosNoAgregados.length,
         detallesNoAgregados: registrosNoAgregados,
@@ -301,7 +308,7 @@ export const procesarConciliacion = async (req, res) => {
 
     res.json({
       success: true,
-      totalRegistrosEstadoCuenta: registrosEC.length,
+      totalRegistrosEstadoCuenta: totalRegistros,
       registrosAgregados: registrosNuevos.length,
       registrosNoAgregados: registrosNoAgregados.length,
       detallesNoAgregados: registrosNoAgregados,

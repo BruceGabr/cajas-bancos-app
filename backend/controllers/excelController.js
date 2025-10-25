@@ -15,7 +15,7 @@ const convertirFechaExcel = (fecha) => {
     const partes = fecha.split(/[-/]/);
     if (partes.length === 3) {
       const dia = parseInt(partes[0], 10);
-      const mes = parseInt(partes[1], 10) - 1; // Mes base 0
+      const mes = parseInt(partes[1], 10) - 1;
       let año = parseInt(partes[2], 10);
       if (año < 100) año += 2000;
       fechaDate = new Date(año, mes, dia);
@@ -26,9 +26,18 @@ const convertirFechaExcel = (fecha) => {
     fechaDate = new Date(fecha);
   }
 
-  // Ajuste para zona horaria
   fechaDate.setMinutes(fechaDate.getMinutes() - fechaDate.getTimezoneOffset());
   return fechaDate;
+};
+
+// Formatear fecha para mostrar (DD-MM-YYYY)
+const formatearFecha = (fecha) => {
+  if (!fecha) return "";
+  const fechaDate = convertirFechaExcel(fecha);
+  const dia = String(fechaDate.getDate()).padStart(2, "0");
+  const mes = String(fechaDate.getMonth() + 1).padStart(2, "0");
+  const año = fechaDate.getFullYear();
+  return `${dia}-${mes}-${año}`;
 };
 
 // Procesar Estado de Cuenta
@@ -36,7 +45,6 @@ const procesarEstadoCuenta = async (filePath) => {
   const workbook = await XlsxPopulate.fromFileAsync(filePath);
   const sheet = workbook.sheet(0);
 
-  // Buscar encabezado
   let headerRow = null;
   for (let i = 1; i <= 50; i++) {
     const cellValue = sheet.cell(`A${i}`).value();
@@ -57,7 +65,6 @@ const procesarEstadoCuenta = async (filePath) => {
   if (!headerRow)
     throw new Error("No se encontró el encabezado en el estado de cuenta");
 
-  // Identificar columnas
   const usedRange = sheet.usedRange();
   const endCol = usedRange.endCell().columnNumber();
 
@@ -80,8 +87,8 @@ const procesarEstadoCuenta = async (filePath) => {
     throw new Error("No se encontraron todas las columnas necesarias");
   }
 
-  // Extraer registros
   const registros = [];
+  const registrosExcluidos = [];
   const endRow = usedRange.endCell().rowNumber();
 
   for (let row = headerRow + 1; row <= endRow; row++) {
@@ -89,26 +96,49 @@ const procesarEstadoCuenta = async (filePath) => {
     if (!concepto) continue;
     const conceptoStr = concepto.toString().trim();
 
-    if (
-      conceptoStr.startsWith("Saldo Inicial:") ||
-      conceptoStr.startsWith("Saldo Final:") ||
-      conceptoStr === "ITF" ||
-      conceptoStr.startsWith("COMIS")
-    )
-      continue;
-
     let nDoc = sheet.cell(row, nDocCol).value();
     if (nDoc) nDoc = nDoc.toString().trim();
 
     const fecha = sheet.cell(row, fOpCol).value();
     const importe = parseFloat(sheet.cell(row, importeCol).value()) || 0;
 
+    // 🚫 Eliminar saldos iniciales/finales (no se almacenan)
+    if (
+      conceptoStr.startsWith("Saldo Inicial:") ||
+      conceptoStr.startsWith("Saldo Final:")
+    ) {
+      continue;
+    }
+
+    // 📦 Almacenar ITF y comisiones como excluidos
+    if (conceptoStr === "ITF") {
+      registrosExcluidos.push({
+        fecha: formatearFecha(fecha),
+        nDoc: nDoc || "",
+        descripcion: conceptoStr,
+        importe: importe,
+        razon: "ITF",
+      });
+      continue;
+    }
+
+    if (conceptoStr.startsWith("COMIS")) {
+      registrosExcluidos.push({
+        fecha: formatearFecha(fecha),
+        nDoc: nDoc || "",
+        descripcion: conceptoStr,
+        importe: importe,
+        razon: "Comisión",
+      });
+      continue;
+    }
+
     registros.push({ fecha, nDoc, descripcion: conceptoStr, importe });
   }
 
   registros.sort((a, b) => parseInt(a.nDoc) - parseInt(b.nDoc));
 
-  return registros;
+  return { registros, registrosExcluidos };
 };
 
 // Controlador principal
@@ -129,7 +159,9 @@ export const procesarConciliacion = async (req, res) => {
     const estadoCuentaPath = req.files.estadoCuenta[0].path;
     const cajasYBancosPath = req.files.cajasYBancos[0].path;
 
-    const registrosEC = await procesarEstadoCuenta(estadoCuentaPath);
+    const { registros: registrosEC, registrosExcluidos } =
+      await procesarEstadoCuenta(estadoCuentaPath);
+
     const workbook = await XlsxPopulate.fromFileAsync(cajasYBancosPath);
 
     const sheetName = `${mes} ${moneda}`;
@@ -146,15 +178,25 @@ export const procesarConciliacion = async (req, res) => {
     }
 
     const startRow = moneda === "ME" ? 32 : 33;
-    const colFecha = 3; // C
-    const colN = 6; // F
-    const colDesc = 8; // H
-    const colDebe = 14; // N
-    const colHaber = 15; // O
+    const colFecha = 3;
+    const colN = 6;
+    const colDesc = 8;
+    const colDebe = 14;
+    const colHaber = 15;
 
     // Última fila con datos
     let lastRow = startRow;
     while (sheet.cell(lastRow, colN).value()) lastRow++;
+
+    // Obtener todos los números de documento ya existentes
+    const nDocsExistentes = new Set();
+    for (let row = startRow; row < lastRow; row++) {
+      const nDocValue = sheet.cell(row, colN).value();
+      if (nDocValue) {
+        const nDocStr = nDocValue.toString().replace(/^0+/, "");
+        nDocsExistentes.add(nDocStr);
+      }
+    }
 
     let lastNDoc = 0;
     if (lastRow > startRow) {
@@ -163,16 +205,42 @@ export const procesarConciliacion = async (req, res) => {
         lastNDoc = parseInt(lastNValue.toString().replace(/^0+/, "")) || 0;
     }
 
-    const registrosNuevos = registrosEC.filter(
-      (r) => parseInt(r.nDoc) > lastNDoc
-    );
+    // Separar registros nuevos y duplicados
+    const registrosNuevos = [];
+    const registrosDuplicados = [];
+
+    registrosEC.forEach((r) => {
+      const nDocNum = parseInt(r.nDoc);
+      const nDocStr = r.nDoc.toString().replace(/^0+/, "");
+
+      if (nDocsExistentes.has(nDocStr)) {
+        registrosDuplicados.push({
+          fecha: formatearFecha(r.fecha),
+          nDoc: r.nDoc || "",
+          descripcion: r.descripcion,
+          importe: r.importe,
+          razon: "Ya registrado",
+        });
+      } else if (nDocNum > lastNDoc) {
+        registrosNuevos.push(r);
+      }
+    });
+
+    // Combinar todos los registros no agregados
+    const registrosNoAgregados = [
+      ...registrosDuplicados,
+      ...registrosExcluidos,
+    ];
 
     if (registrosNuevos.length === 0) {
       fs.unlinkSync(estadoCuentaPath);
       fs.unlinkSync(cajasYBancosPath);
       return res.json({
         success: true,
+        totalRegistrosEstadoCuenta: registrosEC.length,
         registrosAgregados: 0,
+        registrosNoAgregados: registrosNoAgregados.length,
+        detallesNoAgregados: registrosNoAgregados,
         message: "No hay registros nuevos para agregar",
       });
     }
@@ -181,14 +249,12 @@ export const procesarConciliacion = async (req, res) => {
     registrosNuevos.forEach((reg, idx) => {
       const rowIdx = lastRow + idx;
 
-      // Fecha
       const cellFecha = sheet.cell(rowIdx, colFecha);
       const fechaExcel = convertirFechaExcel(reg.fecha);
       cellFecha.value(fechaExcel);
 
-      // 🔹 N° Documento — insertar como número, manteniendo formato original
       const nDocCell = sheet.cell(rowIdx, colN);
-      const formatoOriginal = nDocCell.style("numberFormat"); // guardar formato previo
+      const formatoOriginal = nDocCell.style("numberFormat");
 
       let nDocNumerico = null;
       if (reg.nDoc && /^\d+$/.test(reg.nDoc.trim())) {
@@ -198,15 +264,12 @@ export const procesarConciliacion = async (req, res) => {
         nDocCell.value(reg.nDoc?.trim() || "");
       }
 
-      // Restaurar formato original (mantener “Código postal” u otro)
       if (formatoOriginal) {
         nDocCell.style("numberFormat", formatoOriginal);
       }
 
-      // Descripción
       sheet.cell(rowIdx, colDesc).value(reg.descripcion);
 
-      // Importes
       if (reg.importe > 0) {
         sheet
           .cell(rowIdx, colDebe)
@@ -221,27 +284,27 @@ export const procesarConciliacion = async (req, res) => {
           .style("numberFormat", "#,##0.00");
       }
 
-      // 🟨 Resaltar en amarillo las columnas C → O
       for (let col = 3; col <= 15; col++) {
         sheet.cell(rowIdx, col).style("fill", "FFFF00");
       }
     });
 
-    // Guardar archivo final
     const outputPath = cajasYBancosPath.replace(".xlsx", "-actualizado.xlsx");
     await workbook.toFileAsync(outputPath);
 
     const fileBuffer = fs.readFileSync(outputPath);
     const base64File = fileBuffer.toString("base64");
 
-    // Limpiar archivos temporales
     fs.unlinkSync(estadoCuentaPath);
     fs.unlinkSync(cajasYBancosPath);
     fs.unlinkSync(outputPath);
 
     res.json({
       success: true,
+      totalRegistrosEstadoCuenta: registrosEC.length,
       registrosAgregados: registrosNuevos.length,
+      registrosNoAgregados: registrosNoAgregados.length,
+      detallesNoAgregados: registrosNoAgregados,
       message: `${registrosNuevos.length} registro(s) agregado(s) exitosamente`,
       file: base64File,
       fileName: `Cajas_Bancos_${mes}_${moneda}_${

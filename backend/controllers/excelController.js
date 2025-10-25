@@ -182,9 +182,8 @@ export const procesarConciliacion = async (req, res) => {
       const rowIdx = lastRow + idx;
       const cellFecha = sheet.cell(rowIdx, colFecha);
       const fechaExcel = convertirFechaExcel(reg.fecha);
-      cellFecha.value(fechaExcel); // Solo la fecha se corrige
+      cellFecha.value(fechaExcel);
 
-      // Las demás columnas se dejan igual
       sheet.cell(rowIdx, colN).value(reg.nDoc);
       sheet.cell(rowIdx, colDesc).value(reg.descripcion);
 
@@ -200,6 +199,11 @@ export const procesarConciliacion = async (req, res) => {
           .cell(rowIdx, colHaber)
           .value(Math.abs(reg.importe))
           .style("numberFormat", "#,##0.00");
+      }
+
+      // Resaltar en amarillo las columnas C → O del registro insertado
+      for (let col = 3; col <= 15; col++) {
+        sheet.cell(rowIdx, col).style({ fill: { type: "solid", color: "#FFFF00" } });
       }
     });
 
@@ -232,11 +236,9 @@ export const procesarConciliacion = async (req, res) => {
           fs.unlinkSync(req.files.cajasYBancos[0].path);
       } catch {}
     }
-    res
-      .status(500)
-      .json({
-        error: error.message || "Error procesando archivos",
-        details: error.stack,
-      });
+    res.status(500).json({
+      error: error.message || "Error procesando archivos",
+      details: error.stack,
+    });
   }
 };

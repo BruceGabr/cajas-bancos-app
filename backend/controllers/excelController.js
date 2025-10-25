@@ -28,7 +28,6 @@ const convertirFechaExcel = (fecha) => {
 
   // Ajuste para zona horaria
   fechaDate.setMinutes(fechaDate.getMinutes() - fechaDate.getTimezoneOffset());
-
   return fechaDate;
 };
 
@@ -131,8 +130,8 @@ export const procesarConciliacion = async (req, res) => {
     const cajasYBancosPath = req.files.cajasYBancos[0].path;
 
     const registrosEC = await procesarEstadoCuenta(estadoCuentaPath);
-
     const workbook = await XlsxPopulate.fromFileAsync(cajasYBancosPath);
+
     const sheetName = `${mes} ${moneda}`;
     let sheet;
     try {
@@ -147,13 +146,13 @@ export const procesarConciliacion = async (req, res) => {
     }
 
     const startRow = moneda === "ME" ? 32 : 33;
-    const colFecha = 3; // Columna C
-    const colN = 6;
-    const colDesc = 8;
-    const colDebe = 14;
-    const colHaber = 15;
+    const colFecha = 3; // C
+    const colN = 6; // F
+    const colDesc = 8; // H
+    const colDebe = 14; // N
+    const colHaber = 15; // O
 
-    // Última fila
+    // Última fila con datos
     let lastRow = startRow;
     while (sheet.cell(lastRow, colN).value()) lastRow++;
 
@@ -167,6 +166,7 @@ export const procesarConciliacion = async (req, res) => {
     const registrosNuevos = registrosEC.filter(
       (r) => parseInt(r.nDoc) > lastNDoc
     );
+
     if (registrosNuevos.length === 0) {
       fs.unlinkSync(estadoCuentaPath);
       fs.unlinkSync(cajasYBancosPath);
@@ -177,27 +177,36 @@ export const procesarConciliacion = async (req, res) => {
       });
     }
 
-    // Insertar registros con fecha corregida
+    // 🔧 Insertar registros
     registrosNuevos.forEach((reg, idx) => {
       const rowIdx = lastRow + idx;
+
+      // Fecha
       const cellFecha = sheet.cell(rowIdx, colFecha);
       const fechaExcel = convertirFechaExcel(reg.fecha);
       cellFecha.value(fechaExcel);
 
-      // ✅ Corrección: insertar N° Doc como número real para evitar advertencia
-      const nDocRaw = reg.nDoc ?? "";
+      // 🔹 N° Documento — insertar como número, manteniendo formato original
       const nDocCell = sheet.cell(rowIdx, colN);
+      const formatoOriginal = nDocCell.style("numberFormat"); // guardar formato previo
 
-      if (/^\d+$/.test(String(nDocRaw).trim())) {
-        const nDocNum = Number(String(nDocRaw).trim());
-        nDocCell.value(nDocNum);
-        nDocCell.style("numberFormat", "0");
+      let nDocNumerico = null;
+      if (reg.nDoc && /^\d+$/.test(reg.nDoc.trim())) {
+        nDocNumerico = parseInt(reg.nDoc.trim(), 10);
+        nDocCell.value(nDocNumerico);
       } else {
-        nDocCell.value(String(nDocRaw).trim());
+        nDocCell.value(reg.nDoc?.trim() || "");
       }
 
+      // Restaurar formato original (mantener “Código postal” u otro)
+      if (formatoOriginal) {
+        nDocCell.style("numberFormat", formatoOriginal);
+      }
+
+      // Descripción
       sheet.cell(rowIdx, colDesc).value(reg.descripcion);
 
+      // Importes
       if (reg.importe > 0) {
         sheet
           .cell(rowIdx, colDebe)
@@ -212,18 +221,20 @@ export const procesarConciliacion = async (req, res) => {
           .style("numberFormat", "#,##0.00");
       }
 
-      // Resaltar en amarillo las columnas C → O del registro insertado
+      // 🟨 Resaltar en amarillo las columnas C → O
       for (let col = 3; col <= 15; col++) {
         sheet.cell(rowIdx, col).style("fill", "FFFF00");
       }
     });
 
+    // Guardar archivo final
     const outputPath = cajasYBancosPath.replace(".xlsx", "-actualizado.xlsx");
     await workbook.toFileAsync(outputPath);
 
     const fileBuffer = fs.readFileSync(outputPath);
     const base64File = fileBuffer.toString("base64");
 
+    // Limpiar archivos temporales
     fs.unlinkSync(estadoCuentaPath);
     fs.unlinkSync(cajasYBancosPath);
     fs.unlinkSync(outputPath);

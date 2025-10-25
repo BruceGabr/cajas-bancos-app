@@ -99,7 +99,7 @@ const procesarEstadoCuenta = async (filePath) => {
       continue;
 
     let nDoc = sheet.cell(row, nDocCol).value();
-    if (nDoc) nDoc = nDoc.toString().trim().replace(/^0+/, "") || "0";
+    if (nDoc) nDoc = nDoc.toString().trim();
 
     const fecha = sheet.cell(row, fOpCol).value();
     const importe = parseFloat(sheet.cell(row, importeCol).value()) || 0;

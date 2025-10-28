@@ -181,7 +181,7 @@ const BancoReconciliacion = () => {
         {resultData && (
           <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
             <h2 className="text-xl font-bold text-slate-800 mb-4">
-              📊 Resumen del Procesamiento
+              Resumen del Procesamiento
             </h2>
 
             <div className="grid md:grid-cols-3 gap-4 mb-6">

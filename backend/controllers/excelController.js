@@ -126,7 +126,7 @@ const procesarEstadoCuenta = async (filePath) => {
       continue;
     }
 
-    if (conceptoStr.startsWith("COMIS")) {
+    if (conceptoStr.startsWith("COMIS") || conceptoStr.startsWith("*COMIS")) {
       registrosExcluidos.push({
         fecha: formatearFecha(fecha),
         nDoc: nDoc || "",

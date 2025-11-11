@@ -126,7 +126,7 @@ const procesarEstadoCuenta = async (filePath) => {
       continue;
     }
 
-    if (conceptoStr.toUpperCase().includes("COMIS.")) {
+    if (conceptoStr.toUpperCase().includes("COMIS.") || conceptoStr.toUpperCase().includes("COM SUNAT")) {
       registrosExcluidos.push({
         fecha: formatearFecha(fecha),
         nDoc: nDoc || "",
